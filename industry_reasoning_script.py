@@ -154,113 +154,113 @@ class IndustryReasoningAPI:
                 "reasoning_effort": "medium"  # o3-mini specific parameter (no temperature!)
             }
         
-        try:
-            print(f"  🧠 Sending to reasoning model (o3-mini via Chat Completions)...")
-            
-            # Make API request with longer timeout and more robust error handling
-            response = self.session.post(
-                self.base_url,
-                headers=self.headers,
-                json=payload,
-                timeout=180  # Increased timeout for reasoning model
-            )
-            
-            if response.status_code != 200:
-                raise Exception(f"API error: {response.status_code} - {response.text}")
-            
-            result = response.json()
-            print(f"    📊 Raw API response received: {len(str(result))} characters")
-            
-            # Extract content from Chat Completions format with detailed debugging
-            if 'choices' not in result:
-                print(f"    ⚠️ No 'choices' in response: {result}")
-                raise ValueError("No choices in API response")
-                
-            if len(result['choices']) == 0:
-                print(f"    ⚠️ Empty choices array: {result}")
-                raise ValueError("Empty choices array")
-                
-            message = result['choices'][0].get('message', {})
-            content = message.get('content', '')
-            
-            print(f"    📝 Content extracted: {len(content)} characters")
-            
-            if not content or content.strip() == "":
-                print(f"    ⚠️ Empty content in message: {message}")
-                print(f"    🔍 Full response for debugging: {result}")
-                raise ValueError("Empty response content - API returned blank")
-            
-            print(f"    ✅ Content preview: {content[:100]}...")
-            
-            # Rest of the processing...
-            
-            # Clean and parse JSON - More robust approach
-            content = content.strip()
-            
-            # Remove markdown formatting
-            if '```json' in content:
-                content = content.split('```json')[1].split('```')[0].strip()
-            elif '```' in content:
-                content = content.split('```')[1].split('```')[0].strip()
-            
-            # Find JSON object boundaries
-            json_start = content.find('{')
-            json_end = content.rfind('}') + 1
-            
-            if json_start == -1 or json_end <= json_start:
-                # No JSON found, try to extract key info from text
-                print(f"  ⚠️ No JSON found, attempting text extraction...")
-                return self.extract_from_text(content, case_name, plaintiff, defendant, original_row)
-            
-            json_content = content[json_start:json_end]
-            
-            # Try to fix common JSON issues
-            json_content = self.fix_common_json_issues(json_content)
-            
-            # Parse JSON with error handling
             try:
-                reasoning_result = json.loads(json_content)
-                print(f"    ✅ JSON parsed successfully")
-                break  # Success - exit retry loop
+                print(f"  🧠 Sending to reasoning model (o3-mini via Chat Completions)...")
                 
-            except json.JSONDecodeError as e:
-                print(f"    ⚠️ JSON parse failed: {str(e)[:50]}")
+                # Make API request with longer timeout and more robust error handling
+                response = self.session.post(
+                    self.base_url,
+                    headers=self.headers,
+                    json=payload,
+                    timeout=180  # Increased timeout for reasoning model
+                )
+                
+                if response.status_code != 200:
+                    raise Exception(f"API error: {response.status_code} - {response.text}")
+                
+                result = response.json()
+                print(f"    📊 Raw API response received: {len(str(result))} characters")
+                
+                # Extract content from Chat Completions format with detailed debugging
+                if 'choices' not in result:
+                    print(f"    ⚠️ No 'choices' in response: {result}")
+                    raise ValueError("No choices in API response")
+                    
+                if len(result['choices']) == 0:
+                    print(f"    ⚠️ Empty choices array: {result}")
+                    raise ValueError("Empty choices array")
+                    
+                message = result['choices'][0].get('message', {})
+                content = message.get('content', '')
+                
+                print(f"    📝 Content extracted: {len(content)} characters")
+                
+                if not content or content.strip() == "":
+                    print(f"    ⚠️ Empty content in message: {message}")
+                    print(f"    🔍 Full response for debugging: {result}")
+                    raise ValueError("Empty response content - API returned blank")
+                
+                print(f"    ✅ Content preview: {content[:100]}...")
+                
+                # Rest of the processing...
+                
+                # Clean and parse JSON - More robust approach
+                content = content.strip()
+                
+                # Remove markdown formatting
+                if '```json' in content:
+                    content = content.split('```json')[1].split('```')[0].strip()
+                elif '```' in content:
+                    content = content.split('```')[1].split('```')[0].strip()
+                
+                # Find JSON object boundaries
+                json_start = content.find('{')
+                json_end = content.rfind('}') + 1
+                
+                if json_start == -1 or json_end <= json_start:
+                    # No JSON found, try to extract key info from text
+                    print(f"  ⚠️ No JSON found, attempting text extraction...")
+                    return self.extract_from_text(content, case_name, plaintiff, defendant, original_row)
+                
+                json_content = content[json_start:json_end]
+                
+                # Try to fix common JSON issues
+                json_content = self.fix_common_json_issues(json_content)
+                
+                # Parse JSON with error handling
+                try:
+                    reasoning_result = json.loads(json_content)
+                    print(f"    ✅ JSON parsed successfully")
+                    break  # Success - exit retry loop
+                    
+                except json.JSONDecodeError as e:
+                    print(f"    ⚠️ JSON parse failed: {str(e)[:50]}")
+                    if attempt < max_retries:
+                        print(f"    🔄 Will retry due to JSON parse error...")
+                        continue  # Try again
+                    else:
+                        print(f"    ⚠️ All retries failed, using text extraction...")
+                        return self.extract_from_text(content, case_name, plaintiff, defendant, original_row)
+
+                # Update the original row with new industry information
+                updated_row = original_row.copy()
+                updated_row.update({
+                    "Plaintiff Industry": reasoning_result.get("plaintiff_industry", "Unknown"),
+                    "Plaintiff Industry (Broad)": reasoning_result.get("plaintiff_industry_broad", "Other"),
+                    "Defendant Industry": reasoning_result.get("defendant_industry", "Unknown"), 
+                    "Defendant Industry (Broad)": reasoning_result.get("defendant_industry_broad", "Other"),
+                    "Status": f"Reasoned - {reasoning_result.get('confidence_level', 'Unknown')} confidence"
+                })
+                
+                confidence = reasoning_result.get('confidence_level', 'Unknown')
+                print(f"  ✅ Industries classified: {confidence} confidence")
+                if confidence == 'Low':
+                    reasoning_approach = reasoning_result.get('reasoning_approach', 'N/A')[:100]
+                    print(f"     Approach: {reasoning_approach}...")
+                
+                return updated_row
+
+            except Exception as e:
+                print(f"    ❌ API error on attempt {attempt + 1}: {str(e)[:100]}")
                 if attempt < max_retries:
-                    print(f"    🔄 Will retry due to JSON parse error...")
+                    print(f"    🔄 Will retry due to API error...")
                     continue  # Try again
                 else:
-                    print(f"    ⚠️ All retries failed, using text extraction...")
-                    return self.extract_from_text(content, case_name, plaintiff, defendant, original_row)
-
-            # Update the original row with new industry information
-            updated_row = original_row.copy()
-            updated_row.update({
-                "Plaintiff Industry": reasoning_result.get("plaintiff_industry", "Unknown"),
-                "Plaintiff Industry (Broad)": reasoning_result.get("plaintiff_industry_broad", "Other"),
-                "Defendant Industry": reasoning_result.get("defendant_industry", "Unknown"), 
-                "Defendant Industry (Broad)": reasoning_result.get("defendant_industry_broad", "Other"),
-                "Status": f"Reasoned - {reasoning_result.get('confidence_level', 'Unknown')} confidence"
-            })
-            
-            confidence = reasoning_result.get('confidence_level', 'Unknown')
-            print(f"  ✅ Industries classified: {confidence} confidence")
-            if confidence == 'Low':
-                reasoning_approach = reasoning_result.get('reasoning_approach', 'N/A')[:100]
-                print(f"     Approach: {reasoning_approach}...")
-            
-            return updated_row
-
-        except Exception as e:
-            print(f"    ❌ API error on attempt {attempt + 1}: {str(e)[:100]}")
-            if attempt < max_retries:
-                print(f"    🔄 Will retry due to API error...")
-                continue  # Try again
-            else:
-                print(f"    ❌ All retries failed")
-                # Return original row with error status
-                error_row = original_row.copy()
-                error_row["Status"] = f"All retries failed: {str(e)[:100]}"
-                return error_row
+                    print(f"    ❌ All retries failed")
+                    # Return original row with error status
+                    error_row = original_row.copy()
+                    error_row["Status"] = f"All retries failed: {str(e)[:100]}"
+                    return error_row
     
     def fix_common_json_issues(self, json_str: str) -> str:
         """Fix common JSON formatting issues."""
