@@ -90,6 +90,43 @@ error.
 - `ModuleNotFoundError` indicates the dependencies were not installed—rerun the
   `pip install -r requirements.txt` command inside your virtual environment.
 
+## Publishing the project to GitHub
+
+Follow these steps to put the repository under version control and upload it to
+GitHub. The commands assume you are in the project directory (the folder that
+contains this README) when you run them.
+
+1. **Create a Git repository locally (if one does not already exist).**
+   ```bash
+   git init
+   git add .
+   git commit -m "Initial commit"
+   ```
+2. **Create an empty repository on GitHub.** Visit
+   [https://github.com/new](https://github.com/new), sign in, choose a name (for
+   example `wa-site-research`), and click **Create repository**. Do **not** add a
+   README or other starter files when prompted.
+3. **Connect your local repository to GitHub.** Replace `YOUR-USERNAME` and
+   `REPO-NAME` with the values you chose on GitHub:
+   ```bash
+   git remote add origin https://github.com/YOUR-USERNAME/REPO-NAME.git
+   ```
+4. **Push your code to GitHub.** The first push uploads the `main` branch:
+   ```bash
+   git branch -M main
+   git push -u origin main
+   ```
+5. **Upload future changes.** Each time you edit files, stage, commit, and push
+   them:
+   ```bash
+   git add path/to/changed_files
+   git commit -m "Describe the update"
+   git push
+   ```
+
+If you prefer SSH instead of HTTPS, replace the remote URL in step 3 with the
+SSH clone URL that GitHub shows you.
+
 ## Customising the model
 
 Pass the `--model` flag to experiment with a different model ID:
